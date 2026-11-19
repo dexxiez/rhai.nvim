@@ -1,0 +1,138 @@
+*rhai.txt*  Rhai language support for Neovim
+
+==============================================================================
+CONTENTS                                                       *rhai-contents*
+
+  1. Introduction ............................................ |rhai-intro|
+  2. Setup ................................................... |rhai-setup|
+  3. Configuration ........................................... |rhai-config|
+  4. Commands ................................................ |rhai-commands|
+  5. Formatting .............................................. |rhai-format|
+  6. Tree-sitter ............................................. |rhai-treesitter|
+  7. Troubleshooting ......................................... |rhai-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                                   *rhai-intro*
+
+rhai.nvim adds support for the Rhai scripting language (https://rhai.rs):
+
+- Filetype detection for `*.rhai` files.
+- The Rhai language server (https://github.com/rhaiscript/lsp): diagnostics,
+  hover, definitions, references, rename, completion, symbols and semantic
+  highlighting.
+- Formatting through the language server, with optional format-on-save.
+- Optional tree-sitter highlighting, folds and indents.
+
+Requires Neovim 0.11 or newer.
+
+==============================================================================
+2. SETUP                                                          *rhai-setup*
+
+With lazy.nvim: >lua
+    { "dexxiez/rhai.nvim", ft = "rhai", opts = {} }
+<
+Or call setup yourself: >lua
+    require("rhai").setup({})
+<
+Then install the language server with |:RhaiInstall|.
+
+Without setup(), you can still start the server with the bundled
+`lsp/rhai.lua` config: >lua
+    vim.lsp.enable("rhai")
+<
+==============================================================================
+3. CONFIGURATION                                                 *rhai-config*
+
+                                                               *rhai.setup()*
+require("rhai").setup({opts})
+
+  {opts} is a `rhai.UserConfig` table. Every field is optional. Defaults: >lua
+    {
+      format_on_save = false,
+      treesitter = true,
+      lsp = {
+        enabled = true,
+        cmd = { "rhai", "lsp", "stdio" },
+        root_markers = { "Rhai.toml", ".git" },
+        settings = {},
+      },
+    }
+<
+  format_on_save  (boolean)                          *rhai-opt-format_on_save*
+      Format `rhai` buffers with the language server before writing.
+
+  treesitter  (boolean)                                  *rhai-opt-treesitter*
+      Start tree-sitter highlighting when the `rhai` parser is installed.
+
+  lsp.enabled  (boolean)                                *rhai-opt-lsp.enabled*
+      Start the language server for `rhai` buffers.
+
+  lsp.cmd  (string[])                                       *rhai-opt-lsp.cmd*
+      Command that starts the server. Use a full path if `rhai` is not on
+      your PATH. Replaces the default list; it is not merged.
+
+  lsp.root_markers  (string[])                     *rhai-opt-lsp.root_markers*
+      Files that mark the project root.
+
+  lsp.settings  (table)                                *rhai-opt-lsp.settings*
+      Settings sent to the server.
+
+The server reads `Rhai.toml` at the project root. Create one with
+`rhai config init`.
+
+==============================================================================
+4. COMMANDS                                                    *rhai-commands*
+
+                                                                *:RhaiInstall*
+:RhaiInstall[!]
+      Install the language server with `cargo install` (needs Rust, see
+      https://rustup.rs). It runs in the background and reports progress
+      with |vim.notify()|. The binary goes in `~/.cargo/bin`, which must be
+      on your PATH. With [!], reinstall even if it is already installed.
+
+:checkhealth rhai
+      Check the Neovim version, the server binary, cargo, running clients
+      and the tree-sitter parser.
+
+==============================================================================
+5. FORMATTING                                                    *rhai-format*
+
+Format a buffer with: >vim
+    :lua vim.lsp.buf.format()
+<
+Set |rhai-opt-format_on_save| to format on every write.
+
+The server formats whole files using the buffer's 'expandtab' and
+'shiftwidth'. For 4-space indents, put this in `after/ftplugin/rhai.lua`: >lua
+    vim.bo.expandtab = true
+    vim.bo.shiftwidth = 4
+<
+==============================================================================
+6. TREE-SITTER                                               *rhai-treesitter*
+
+The grammar is https://github.com/elkowar/tree-sitter-rhai. With
+nvim-treesitter installed (`main` or `master` branch), rhai.nvim registers
+the grammar so you can run: >vim
+    :TSInstall rhai
+<
+The queries in `queries/rhai/` (highlights, folds, indents, injections,
+locals) ship with this plugin. Without the parser, highlighting comes from
+the language server's semantic tokens.
+
+For tree-sitter folding: >lua
+    vim.wo.foldmethod = "expr"
+    vim.wo.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+<
+==============================================================================
+7. TROUBLESHOOTING                                     *rhai-troubleshooting*
+
+Run |:checkhealth| `rhai` first.
+
+- "`rhai` not found": run |:RhaiInstall|, add `~/.cargo/bin` to PATH, or
+  set |rhai-opt-lsp.cmd| to the full path.
+- Server logs: >vim
+    :lua vim.cmd.edit(vim.lsp.log.get_filename())
+<
+The upstream language server is marked experimental.
+
+ vim:tw=78:ts=8:ft=help:norl:
