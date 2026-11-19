@@ -1,0 +1,3 @@
+# Local dev dependencies (rhai binary, compiled parser)
+.deps/
+doc/tags

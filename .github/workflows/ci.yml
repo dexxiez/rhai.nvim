@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint (stylua)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: v2.1.0
+          args: --check .
+
+  typecheck:
+    name: Type check (lua-language-server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: v0.11.5
+      - name: Install lua-language-server
+        run: |
+          mkdir -p "$RUNNER_TEMP/luals"
+          curl -sSfL https://github.com/LuaLS/lua-language-server/releases/download/3.15.0/lua-language-server-3.15.0-linux-x64.tar.gz \
+            | tar xz -C "$RUNNER_TEMP/luals"
+          echo "$RUNNER_TEMP/luals/bin" >> "$GITHUB_PATH"
+      - run: make typecheck
+
+  test:
+    name: Test (Neovim ${{ matrix.nvim }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.nvim == 'nightly' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        nvim: [v0.11.5, nightly]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.nvim }}
+      - name: Cache language server
+        id: cache-lsp
+        uses: actions/cache@v4
+        with:
+          path: .deps/bin
+          key: rhai-lsp-${{ runner.os }}-${{ hashFiles('lua/rhai/install.lua') }}
+      - name: Build language server
+        if: steps.cache-lsp.outputs.cache-hit != 'true'
+        run: make deps-lsp
+      - name: Build tree-sitter parser
+        run: make deps-parser
+      - run: make test
