@@ -2,9 +2,9 @@
 
 local M = {}
 
-local health = vim.health
-
 function M.check()
+  -- Looked up at call time so tests can stub the reporters.
+  local health = vim.health
   local config = require("rhai.config").get()
 
   health.start("rhai.nvim: Neovim")

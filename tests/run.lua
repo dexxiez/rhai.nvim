@@ -214,13 +214,54 @@ end, ts_skip)
 
 -- ── health ────────────────────────────────────────────────────────────────
 
-test("health: :checkhealth rhai reports no errors", function()
+---@class rhai.test.HealthCall
+---@field kind "start"|"ok"|"info"|"warn"|"error"
+---@field msg string
+
+--- Run rhai's health check with `vim.health` reporters stubbed out.
+--- (Calling `:checkhealth` is UI-dependent: nightly fills its buffer asynchronously.)
+---@return rhai.test.HealthCall[]
+local function run_health()
+  ---@type rhai.test.HealthCall[]
+  local calls = {}
+  local kinds = { "start", "ok", "info", "warn", "error" }
+  local saved = {}
+  for _, kind in ipairs(kinds) do
+    saved[kind] = vim.health[kind]
+    vim.health[kind] = function(msg)
+      table.insert(calls, { kind = kind, msg = msg })
+    end
+  end
+  local success, err = pcall(require("rhai.health").check)
+  for _, kind in ipairs(kinds) do
+    vim.health[kind] = saved[kind]
+  end
+  if not success then
+    error(err, 0)
+  end
+  return calls
+end
+
+test("health: check reports no errors", function()
   reset()
   require("rhai").setup({ lsp = { cmd = lsp_cmd } })
-  vim.cmd("silent checkhealth rhai")
-  local text = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
-  ok(text:find("rhai.nvim: language server", 1, true), "health section missing:\n" .. text)
-  ok(not text:find("ERROR", 1, true), "health reported errors:\n" .. text)
+  local calls = run_health()
+  local report = vim.inspect(calls)
+
+  local function has(kind, pattern)
+    for _, call in ipairs(calls) do
+      if call.kind == kind and call.msg:find(pattern, 1, true) then
+        return true
+      end
+    end
+    return false
+  end
+
+  ok(has("start", "rhai.nvim: language server"), "language server section missing:\n" .. report)
+  ok(has("ok", lsp_bin), "binary not reported as found:\n" .. report)
+  ok(not vim.iter(calls):any(function(c)
+    return c.kind == "error"
+  end), "health reported errors:\n" .. report)
 end, lsp_skip)
 
 -- ── run ───────────────────────────────────────────────────────────────────
